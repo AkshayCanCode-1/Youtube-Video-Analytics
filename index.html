@@ -30,27 +30,20 @@
       });
     }
 
-    async function logEvent(eventType, timestamp, extraData = "") {
-      console.log("Sending event:", eventType, timestamp, extraData);
+    async function logEvent(eventType, videoId, timestamp) {
+  try {
+    const res = await fetch("https://your-worker-name.workers.dev", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventType, videoId, timestamp }),
+    });
+    const data = await res.json();
+    console.log("Logged:", data);
+  } catch (err) {
+    console.error("Logging failed", err);
+  }
+}
 
-      try {
-        const response = await fetch(ENDPOINT, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            eventType,
-            videoId,
-            timestamp,
-            extraData
-          })
-        });
-
-        const result = await response.json();
-        console.log("Logged successfully:", result);
-      } catch (err) {
-        console.error("Error logging:", err);
-      }
-    }
 
     function onPlayerReady(event) {
       setInterval(trackProgress, 5000);
