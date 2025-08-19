@@ -1,80 +1,104 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Video Analysis</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Video Analytics</title>
+
+  <!-- Favicon (make sure you add favicon.ico or favicon.png in repo root) -->
+  <link rel="icon" href="favicon.ico" type="image/x-icon" />
+
+  <!-- YouTube IFrame API -->
   <script src="https://www.youtube.com/iframe_api"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 2rem;
+      background: #f9f9f9;
+    }
+    #player {
+      margin: 2rem auto;
+    }
+    #log {
+      text-align: left;
+      max-width: 600px;
+      margin: 2rem auto;
+      padding: 1rem;
+      border: 1px solid #ccc;
+      background: #fff;
+      font-size: 14px;
+      overflow-y: auto;
+      height: 200px;
+    }
+  </style>
 </head>
 <body>
-  <h2>Video Tracker Test</h2>
+  <h1>YouTube Video Analytics</h1>
+
+  <!-- YouTube video embed -->
   <div id="player"></div>
 
+  <div id="log"></div>
+
   <script>
-    const params = new URLSearchParams(window.location.search);
-    const videoId = params.get("videoId") || "testVideo";   // internal ID
-    const ytId = params.get("yt") || "dQw4w9WgXcQ";        // YouTube video ID
+    // Logging function
+    async function logEvent(eventName, data = {}) {
+      try {
+        const resp = await fetch("https://your-worker-name.workers.dev", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ event: eventName, data }),
+        });
+        const result = await resp.json();
+        addLog("Logged: " + JSON.stringify(result));
+      } catch (err) {
+        addLog("Logging failed: " + err.message);
+      }
+    }
 
-    // Replace with your Apps Script Web App URL (/exec)
-    const ENDPOINT = "https://script.google.com/macros/s/AKfycbyBoVsOoYE4mxssjQglx1eMK3XuxfJEciV2Jd8jU5bVsylpHGBtMMkatC6Zc8QxokE9qg/exec";
+    function addLog(message) {
+      const log = document.getElementById("log");
+      log.innerHTML += `<div>${new Date().toISOString()} - ${message}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
 
+    // YouTube API setup
     let player;
-
     function onYouTubeIframeAPIReady() {
       player = new YT.Player("player", {
-        height: "360",
+        height: "390",
         width: "640",
-        videoId: ytId,
+        videoId: "dQw4w9WgXcQ", // Replace with your video ID
         events: {
-          "onStateChange": onPlayerStateChange,
-          "onReady": onPlayerReady
-        }
+          onReady: () => addLog("Player ready"),
+          onStateChange: onPlayerStateChange,
+        },
       });
     }
 
-    async function logEvent(eventType, videoId, timestamp) {
-  try {
-    const res = await fetch("https://blue-sunset-9b47.akshay-n.workers.dev/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ eventType, videoId, timestamp }),
-    });
-    const data = await res.json();
-    console.log("Logged:", data);
-  } catch (err) {
-    console.error("Logging failed", err);
-  }
-}
-
-
-    function onPlayerReady(event) {
-      setInterval(trackProgress, 5000);
-    }
-
-    let lastTime = 0;
     function onPlayerStateChange(event) {
-      const state = event.data;
-      const currentTime = player.getCurrentTime();
-
-      if (state === YT.PlayerState.PLAYING) logEvent("play", currentTime);
-      if (state === YT.PlayerState.PAUSED) logEvent("pause", currentTime);
-      if (state === YT.PlayerState.ENDED) logEvent("ended", currentTime);
-
-      if (Math.abs(currentTime - lastTime) > 5) {
-        if (currentTime < lastTime) {
-          logEvent("seek-rewind", currentTime, `jump from ${lastTime} to ${currentTime}`);
-        } else {
-          logEvent("seek-forward", currentTime, `jump from ${lastTime} to ${currentTime}`);
-        }
-      }
-
-      lastTime = currentTime;
-    }
-
-    function trackProgress() {
-      if (player && player.getPlayerState() === YT.PlayerState.PLAYING) {
-        const currentTime = player.getCurrentTime();
-        logEvent("progress", currentTime);
+      switch (event.data) {
+        case YT.PlayerState.PLAYING:
+          logEvent("playing");
+          break;
+        case YT.PlayerState.PAUSED:
+          logEvent("paused");
+          break;
+        case YT.PlayerState.ENDED:
+          logEvent("ended");
+          break;
       }
     }
+
+    // Optional: track progress
+    setInterval(() => {
+      if (player && player.getCurrentTime) {
+        logEvent("progress", { time: player.getCurrentTime() });
+      }
+    }, 10000); // every 10s
   </script>
 </body>
 </html>
