@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Video Analysis</title>
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+  <h2>Video Tracker Test</h2>
+  <div id="player"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const videoId = params.get("videoId") || "testVideo";   // internal ID
+    const ytId = params.get("yt") || "dQw4w9WgXcQ";        // YouTube video ID
+
+    // Replace with your Apps Script Web App URL (/exec)
+    const ENDPOINT = "https://script.google.com/macros/s/AKfycbyBoVsOoYE4mxssjQglx1eMK3XuxfJEciV2Jd8jU5bVsylpHGBtMMkatC6Zc8QxokE9qg/exec";
+
+    let player;
+
+    function onYouTubeIframeAPIReady() {
+      player = new YT.Player("player", {
+        height: "360",
+        width: "640",
+        videoId: ytId,
+        events: {
+          "onStateChange": onPlayerStateChange,
+          "onReady": onPlayerReady
+        }
+      });
+    }
+
+    async function logEvent(eventType, timestamp, extraData = "") {
+      console.log("Sending event:", eventType, timestamp, extraData);
+
+      try {
+        const response = await fetch(ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventType,
+            videoId,
+            timestamp,
+            extraData
+          })
+        });
+
+        const result = await response.json();
+        console.log("Logged successfully:", result);
+      } catch (err) {
+        console.error("Error logging:", err);
+      }
+    }
+
+    function onPlayerReady(event) {
+      setInterval(trackProgress, 5000);
+    }
+
+    let lastTime = 0;
+    function onPlayerStateChange(event) {
+      const state = event.data;
+      const currentTime = player.getCurrentTime();
+
+      if (state === YT.PlayerState.PLAYING) logEvent("play", currentTime);
+      if (state === YT.PlayerState.PAUSED) logEvent("pause", currentTime);
+      if (state === YT.PlayerState.ENDED) logEvent("ended", currentTime);
+
+      if (Math.abs(currentTime - lastTime) > 5) {
+        if (currentTime < lastTime) {
+          logEvent("seek-rewind", currentTime, `jump from ${lastTime} to ${currentTime}`);
+        } else {
+          logEvent("seek-forward", currentTime, `jump from ${lastTime} to ${currentTime}`);
+        }
+      }
+
+      lastTime = currentTime;
+    }
+
+    function trackProgress() {
+      if (player && player.getPlayerState() === YT.PlayerState.PLAYING) {
+        const currentTime = player.getCurrentTime();
+        logEvent("progress", currentTime);
+      }
+    }
+  </script>
+</body>
+</html>
