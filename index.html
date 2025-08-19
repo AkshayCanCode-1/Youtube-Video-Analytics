@@ -14,76 +14,64 @@
 
   <!-- YouTube iframe -->
   <div id="player"></div>
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+const videoId = "dQw4w9WgXcQ"; 
+const ENDPOINT = "https://blue-sunset-9b47.akshay-n.workers.dev/";
 
-  <script>
-    const WORKER_URL = "https://blue-sunset-9b47.akshay-n.workers.dev/"; // <-- your Worker URL
-    let STUDENT_EMAIL = null;
+let player;
+let lastTime = 0;
 
-    function saveEmail() {
-      const input = document.getElementById("studentEmail").value;
-      if (input) {
-        STUDENT_EMAIL = input;
-        localStorage.setItem("studentEmail", input);
-        document.getElementById("status").textContent = "✅ Email saved";
-      }
+function onYouTubeIframeAPIReady() {
+  player = new YT.Player("player", {
+    height: "360",
+    width: "640",
+    videoId,
+    events: {
+      "onReady": onPlayerReady,
+      "onStateChange": onPlayerStateChange
     }
+  });
+}
 
-    // Load saved email if available
-    window.onload = () => {
-      const saved = localStorage.getItem("studentEmail");
-      if (saved) {
-        STUDENT_EMAIL = saved;
-        document.getElementById("studentEmail").value = saved;
-        document.getElementById("status").textContent = "✅ Email loaded from previous session";
-      }
-    };
+function logEvent(eventType, timestamp, extraData="") {
+  const duration = player ? player.getDuration() : 0;
+  const completionPercent = duration > 0 ? (timestamp / duration) * 100 : 0;
 
-    // Load YouTube API
-    let tag = document.createElement("script");
-    tag.src = "https://www.youtube.com/iframe_api";
-    document.head.appendChild(tag);
+  const body = JSON.stringify({ eventType, videoId, timestamp, extraData, completionPercent });
+  fetch(ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body
+  }).then(res => res.json())
+    .then(data => console.log("Logged:", data))
+    .catch(err => console.error("Logging failed:", err));
+}
 
-    let player;
-    function onYouTubeIframeAPIReady() {
-      player = new YT.Player("player", {
-        height: "390",
-        width: "640",
-        videoId: "dQw4w9WgXcQ",
-        events: { onStateChange: onPlayerStateChange }
-      });
-    }
+function onPlayerReady(event) {
+  setInterval(trackProgress, 5000); // update progress every 5s
+}
 
-    async function logEvent(eventType) {
-      if (!STUDENT_EMAIL) {
-        console.warn("No email set. Event not logged.");
-        return;
-      }
+function onPlayerStateChange(event) {
+  const state = event.data;
+  const currentTime = player.getCurrentTime();
 
-      const data = {
-        email: STUDENT_EMAIL,
-        event: eventType,
-        videoId: player.getVideoData().video_id,
-        timestamp: Math.floor(player.getCurrentTime()),
-        extra: { userAgent: navigator.userAgent }
-      };
+  if(state === YT.PlayerState.PLAYING) logEvent("play", currentTime);
+  if(state === YT.PlayerState.PAUSED) logEvent("pause", currentTime);
+  if(state === YT.PlayerState.ENDED) logEvent("ended", currentTime);
 
-      try {
-        await fetch(WORKER_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(data)
-        });
-        console.log("Logged:", data);
-      } catch (err) {
-        console.error("Error logging:", err);
-      }
-    }
+  if(Math.abs(currentTime - lastTime) > 5) {
+    if(currentTime < lastTime) logEvent("seek-rewind", currentTime, `jump from ${lastTime} to ${currentTime}`);
+    else logEvent("seek-forward", currentTime, `jump from ${lastTime} to ${currentTime}`);
+  }
 
-    function onPlayerStateChange(event) {
-      if (event.data === YT.PlayerState.PLAYING) logEvent("play");
-      if (event.data === YT.PlayerState.PAUSED) logEvent("pause");
-      if (event.data === YT.PlayerState.ENDED) logEvent("ended");
-    }
-  </script>
-</body>
-</html>
+  lastTime = currentTime;
+}
+
+function trackProgress() {
+  if(player && player.getPlayerState() === YT.PlayerState.PLAYING) {
+    logEvent("progress", player.getCurrentTime());
+  }
+}
+</script>
+
