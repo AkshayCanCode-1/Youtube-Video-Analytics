@@ -1,104 +1,78 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>YouTube Video Analytics</title>
-
-  <!-- Favicon (make sure you add favicon.ico or favicon.png in repo root) -->
-  <link rel="icon" href="favicon.ico" type="image/x-icon" />
-
-  <!-- YouTube IFrame API -->
-  <script src="https://www.youtube.com/iframe_api"></script>
-
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 2rem;
-      background: #f9f9f9;
-    }
-    #player {
-      margin: 2rem auto;
-    }
-    #log {
-      text-align: left;
-      max-width: 600px;
-      margin: 2rem auto;
-      padding: 1rem;
-      border: 1px solid #ccc;
-      background: #fff;
-      font-size: 14px;
-      overflow-y: auto;
-      height: 200px;
-    }
-  </style>
+  <meta charset="UTF-8">
+  <title>YouTube Event Logger</title>
 </head>
 <body>
-  <h1>YouTube Video Analytics</h1>
-
-  <!-- YouTube video embed -->
+  <h2>YouTube Player with Event Logging</h2>
   <div id="player"></div>
 
-  <div id="log"></div>
-
   <script>
-    // Logging function
-    async function logEvent(eventName, data = {}) {
-      try {
-        const resp = await fetch("https://blue-sunset-9b47.akshay-n.workers.dev/", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ event: eventName, data }),
-        });
-        const result = await resp.json();
-        addLog("Logged: " + JSON.stringify(result));
-      } catch (err) {
-        addLog("Logging failed: " + err.message);
-      }
-    }
+    // Load YouTube IFrame API
+    var tag = document.createElement('script');
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
 
-    function addLog(message) {
-      const log = document.getElementById("log");
-      log.innerHTML += `<div>${new Date().toISOString()} - ${message}</div>`;
-      log.scrollTop = log.scrollHeight;
-    }
-
-    // YouTube API setup
     let player;
+
     function onYouTubeIframeAPIReady() {
-      player = new YT.Player("player", {
-        height: "390",
-        width: "640",
-        videoId: "dQw4w9WgXcQ", // Replace with your video ID
+      player = new YT.Player('player', {
+        height: '390',
+        width: '640',
+        videoId: 'dQw4w9WgXcQ', // 👈 replace with your sample videoId
         events: {
-          onReady: () => addLog("Player ready"),
-          onStateChange: onPlayerStateChange,
-        },
+          'onReady': onPlayerReady,
+          'onStateChange': onPlayerStateChange
+        }
       });
     }
 
-    function onPlayerStateChange(event) {
-      switch (event.data) {
-        case YT.PlayerState.PLAYING:
-          logEvent("playing");
-          break;
-        case YT.PlayerState.PAUSED:
-          logEvent("paused");
-          break;
-        case YT.PlayerState.ENDED:
-          logEvent("ended");
-          break;
+    function onPlayerReady() {
+      console.log("Player ready");
+    }
+
+    async function logEvent(eventData) {
+      console.log("Logging event:", eventData);
+      try {
+        await fetch("https://blue-sunset-9b47.akshay-n.workers.dev/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(eventData),
+        });
+      } catch (err) {
+        console.error("Logging failed:", err);
       }
     }
 
-    // Optional: track progress
-    setInterval(() => {
-      if (player && player.getCurrentTime) {
-        logEvent("progress", { time: player.getCurrentTime() });
+    function onPlayerStateChange(event) {
+      let state;
+      switch (event.data) {
+        case YT.PlayerState.PLAYING:
+          state = "play";
+          break;
+        case YT.PlayerState.PAUSED:
+          state = "pause";
+          break;
+        case YT.PlayerState.ENDED:
+          state = "ended";
+          break;
+        case YT.PlayerState.BUFFERING:
+          state = "buffering";
+          break;
+        case YT.PlayerState.CUED:
+          state = "cued";
+          break;
+        default:
+          state = "unstarted";
       }
-    }, 10000); // every 10s
+
+      logEvent({
+        event: state,
+        videoTime: player.getCurrentTime(),
+        videoId: player.getVideoData().video_id
+      });
+    }
   </script>
 </body>
 </html>
