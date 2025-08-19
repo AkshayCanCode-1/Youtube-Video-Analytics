@@ -1,77 +1,88 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>YouTube Event Logger</title>
+  <title>YouTube Video Logger</title>
 </head>
 <body>
-  <h2>YouTube Player with Event Logging</h2>
+  <h2>Video Tracker Demo</h2>
+
+  <!-- Email input -->
+  <label>Enter your email: <input type="email" id="studentEmail"></label>
+  <button onclick="saveEmail()">Save</button>
+  <p id="status"></p>
+
+  <!-- YouTube iframe -->
   <div id="player"></div>
 
   <script>
-    // Load YouTube IFrame API
-    var tag = document.createElement('script');
+    const WORKER_URL = "https://blue-sunset-9b47.akshay-n.workers.dev/"; // <-- your Worker URL
+    let STUDENT_EMAIL = null;
+
+    function saveEmail() {
+      const input = document.getElementById("studentEmail").value;
+      if (input) {
+        STUDENT_EMAIL = input;
+        localStorage.setItem("studentEmail", input);
+        document.getElementById("status").textContent = "✅ Email saved";
+      }
+    }
+
+    // Load saved email if available
+    window.onload = () => {
+      const saved = localStorage.getItem("studentEmail");
+      if (saved) {
+        STUDENT_EMAIL = saved;
+        document.getElementById("studentEmail").value = saved;
+        document.getElementById("status").textContent = "✅ Email loaded from previous session";
+      }
+    };
+
+    // Load YouTube API
+    let tag = document.createElement("script");
     tag.src = "https://www.youtube.com/iframe_api";
     document.head.appendChild(tag);
 
     let player;
-
     function onYouTubeIframeAPIReady() {
-      player = new YT.Player('player', {
-        height: '390',
-        width: '640',
-        videoId: 'dQw4w9WgXcQ', // 👈 replace with your sample videoId
-        events: {
-          'onReady': onPlayerReady,
-          'onStateChange': onPlayerStateChange
-        }
+      player = new YT.Player("player", {
+        height: "390",
+        width: "640",
+        videoId: "dQw4w9WgXcQ",
+        events: { onStateChange: onPlayerStateChange }
       });
     }
 
-    function onPlayerReady() {
-      console.log("Player ready");
-    }
+    async function logEvent(eventType) {
+      if (!STUDENT_EMAIL) {
+        console.warn("No email set. Event not logged.");
+        return;
+      }
 
-    async function logEvent(eventData) {
-      console.log("Logging event:", eventData);
+      const data = {
+        email: STUDENT_EMAIL,
+        event: eventType,
+        videoId: player.getVideoData().video_id,
+        timestamp: Math.floor(player.getCurrentTime()),
+        extra: { userAgent: navigator.userAgent }
+      };
+
       try {
-        await fetch("https://blue-sunset-9b47.akshay-n.workers.dev/", {
+        await fetch(WORKER_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(eventData),
+          body: JSON.stringify(data)
         });
+        console.log("Logged:", data);
       } catch (err) {
-        console.error("Logging failed:", err);
+        console.error("Error logging:", err);
       }
     }
 
     function onPlayerStateChange(event) {
-      let state;
-      switch (event.data) {
-        case YT.PlayerState.PLAYING:
-          state = "play";
-          break;
-        case YT.PlayerState.PAUSED:
-          state = "pause";
-          break;
-        case YT.PlayerState.ENDED:
-          state = "ended";
-          break;
-        case YT.PlayerState.BUFFERING:
-          state = "buffering";
-          break;
-        case YT.PlayerState.CUED:
-          state = "cued";
-          break;
-        default:
-          state = "unstarted";
-      }
-
-      logEvent({
-        event: state,
-        videoTime: player.getCurrentTime(),
-        videoId: player.getVideoData().video_id
-      });
+      if (event.data === YT.PlayerState.PLAYING) logEvent("play");
+      if (event.data === YT.PlayerState.PAUSED) logEvent("pause");
+      if (event.data === YT.PlayerState.ENDED) logEvent("ended");
     }
   </script>
 </body>
