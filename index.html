@@ -32,7 +32,7 @@
 
     async function logEvent(eventType, videoId, timestamp) {
   try {
-    const res = await fetch("https://your-worker-name.workers.dev", {
+    const res = await fetch("https://blue-sunset-9b47.akshay-n.workers.dev/", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ eventType, videoId, timestamp }),
