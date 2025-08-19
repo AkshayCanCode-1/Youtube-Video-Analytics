@@ -7,13 +7,9 @@
 <body>
   <h2>Video Tracker Demo</h2>
 
-  <!-- Email input -->
-  <label>Enter your email: <input type="email" id="studentEmail"></label>
-  <button onclick="saveEmail()">Save</button>
-  <p id="status"></p>
-
   <!-- YouTube iframe -->
   <div id="player"></div>
+
 <script src="https://www.youtube.com/iframe_api"></script>
 <script>
 const videoId = "dQw4w9WgXcQ"; 
@@ -21,6 +17,7 @@ const ENDPOINT = "https://blue-sunset-9b47.akshay-n.workers.dev/";
 
 let player;
 let lastTime = 0;
+let maxTime = 0;  // for completion %
 
 function onYouTubeIframeAPIReady() {
   player = new YT.Player("player", {
@@ -35,10 +32,19 @@ function onYouTubeIframeAPIReady() {
 }
 
 function logEvent(eventType, timestamp, extraData="") {
+  if(timestamp > maxTime) maxTime = timestamp;
   const duration = player ? player.getDuration() : 0;
-  const completionPercent = duration > 0 ? (timestamp / duration) * 100 : 0;
+  const completionPercent = duration > 0 ? (maxTime / duration) * 100 : 0;
 
-  const body = JSON.stringify({ eventType, videoId, timestamp, extraData, completionPercent });
+  const body = JSON.stringify({
+    eventType,
+    videoId,
+    timestamp,
+    extraData,
+    completionPercent
+    // email is now handled by Apps Script
+  });
+
   fetch(ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -49,7 +55,7 @@ function logEvent(eventType, timestamp, extraData="") {
 }
 
 function onPlayerReady(event) {
-  setInterval(trackProgress, 5000); // update progress every 5s
+  setInterval(trackProgress, 5000); // log progress every 5s
 }
 
 function onPlayerStateChange(event) {
@@ -60,7 +66,7 @@ function onPlayerStateChange(event) {
   if(state === YT.PlayerState.PAUSED) logEvent("pause", currentTime);
   if(state === YT.PlayerState.ENDED) logEvent("ended", currentTime);
 
-  if(Math.abs(currentTime - lastTime) > 5) {
+  if(Math.abs(currentTime - lastTime) > 2) { // detect seek
     if(currentTime < lastTime) logEvent("seek-rewind", currentTime, `jump from ${lastTime} to ${currentTime}`);
     else logEvent("seek-forward", currentTime, `jump from ${lastTime} to ${currentTime}`);
   }
@@ -74,4 +80,5 @@ function trackProgress() {
   }
 }
 </script>
-
+</body>
+</html>
